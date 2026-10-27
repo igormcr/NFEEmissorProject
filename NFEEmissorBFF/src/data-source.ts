@@ -2,6 +2,7 @@ import "dotenv/config";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { User } from "./entities/User.js";
+import { Certificate } from "./entities/Certificate.js";
 
 const requiredEnvironmentVariables = ["DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME"] as const;
 
@@ -18,7 +19,7 @@ export const AppDataSource = new DataSource({
     username: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    entities: [User],           // import classes directly; avoids glob issues with ESM/tsx
+    entities: [User, Certificate], // import classes directly; avoids glob issues with ESM/tsx
     synchronize: false,         // never true in production
     logging: process.env.NODE_ENV !== "production",
     options: {
