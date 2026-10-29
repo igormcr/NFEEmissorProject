@@ -2,17 +2,24 @@ import type { Request, Response } from "express";
 import { AppDataSource } from "./data-source.js";
 import { decryptSecret } from "./certificate-crypto.js";
 import { Certificate } from "./entities/Certificate.js";
+import { Client } from "./entities/Client.js";
+import { getAuthenticatedUserId } from "./auth.js";
 
 const fiscalApiUrl = process.env.FISCAL_API_URL ?? "http://localhost:5082";
 
 async function certificateHeaders(request: Request): Promise<Record<string, string>> {
-    const userId = request.header("X-User-Id")?.trim();
-    if (!userId) {
-        throw new Error("X-User-Id is required until JWT authentication is configured");
-    }
+    const userId = getAuthenticatedUserId(request);
 
+    const clientId = request.header("X-Client-Id")?.trim();
+    if (!clientId) {
+        throw new Error("X-Client-Id is required to select the client");
+    }
+    const client = await AppDataSource.getRepository(Client).findOne({ where: { id: clientId, userId } });
+    if (!client) {
+        throw new Error("Client not found");
+    }
     const certificate = await AppDataSource.getRepository(Certificate).findOne({
-        where: { userId, status: "active" },
+        where: { userId, clientId, status: "active" },
         order: { expiresAt: "DESC" },
     });
     if (!certificate || certificate.expiresAt <= new Date()) {

@@ -11,6 +11,9 @@ export class User {
     @Column({ type: "nvarchar", length: 255, unique: true })
     email!: string;
 
+    @Column({ type: "nvarchar", length: 255 })
+    passwordHash!: string;
+
     @CreateDateColumn()
     createdAt!: Date;
 }

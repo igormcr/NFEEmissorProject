@@ -9,6 +9,9 @@ export class Certificate {
     userId!: string;
 
     @Column({ type: "nvarchar", length: 255, nullable: true })
+    clientId!: string | null;
+
+    @Column({ type: "nvarchar", length: 255, nullable: true })
     subject!: string | null;
 
     @Column({ type: "nvarchar", length: 14, nullable: true })
