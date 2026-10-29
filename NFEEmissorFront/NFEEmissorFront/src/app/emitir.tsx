@@ -1,5 +1,5 @@
-import { Stack } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { Stack, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
     Alert,
@@ -96,6 +96,7 @@ export default function EmitirScreen() {
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [clientSearch, setClientSearch] = useState('');
+    const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
     const [gerarDanfe, setGerarDanfe] = useState(true);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<string | null>(null);
@@ -107,14 +108,31 @@ export default function EmitirScreen() {
     const [items, setItems] = useState<ItemForm[]>([{ ...emptyItem }]);
     const [additionalInfo, setAdditionalInfo] = useState('');
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
+        let active = true;
+
         listClients()
             .then((response) => {
+                if (!active) return;
+
                 setClients(response.data);
-                setSelectedClientId(response.data[0]?.id ?? null);
+                setSelectedClientId((current) => (
+                    response.data.some((client) => client.id === current)
+                        ? current
+                        : response.data[0]?.id ?? null
+                ));
+                setClientDropdownOpen(false);
             })
-            .catch((error) => Alert.alert('Erro', error instanceof Error ? error.message : 'Não foi possível carregar os clientes.'));
-    }, []);
+            .catch((error) => {
+                if (active) {
+                    Alert.alert('Erro', error instanceof Error ? error.message : 'Não foi possível carregar os clientes.');
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, []));
 
     const selectedClient = clients.find((client) => client.id === selectedClientId);
     const filteredClients = useMemo(() => {
@@ -253,17 +271,53 @@ export default function EmitirScreen() {
                 <Text style={styles.intro}>Preencha os dados por etapas. Campos com * são obrigatórios.</Text>
 
                 <Section title="1. Emitente" description="Escolha uma empresa cadastrada. Os dados fiscais serão preenchidos automaticamente.">
-                    <Field label="Pesquisar cliente" value={clientSearch} onChangeText={setClientSearch} placeholder="Razão social ou CNPJ" />
-                    <View style={styles.clientList}>
-                        {filteredClients.map((client) => (
-                            <Pressable key={client.id} onPress={() => setSelectedClientId(client.id)} style={[styles.clientOption, client.id === selectedClientId && styles.clientOptionSelected]}>
-                                <Text style={styles.clientOptionTitle}>{client.legalName}</Text>
-                                <Text style={styles.clientOptionText}>{client.tradeName || 'Sem nome fantasia'} · CNPJ {client.cnpj}</Text>
+                    <View style={styles.field}>
+                        <Text style={styles.label}>Cliente emitente</Text>
+                        <View style={styles.clientPicker}>
+                            <TextInput
+                                value={clientSearch}
+                                onChangeText={(value) => {
+                                    setClientSearch(value);
+                                    setClientDropdownOpen(true);
+                                }}
+                                onFocus={() => setClientDropdownOpen(true)}
+                                placeholder="Pesquisar por razão social ou CNPJ"
+                                placeholderTextColor="#8a94a6"
+                                style={styles.clientSearchInput}
+                                autoCapitalize="sentences"
+                            />
+                            <Pressable
+                                onPress={() => setClientDropdownOpen((open) => !open)}
+                                style={styles.dropdownButton}
+                                accessibilityLabel={clientDropdownOpen ? 'Fechar lista de clientes' : 'Abrir lista de clientes'}>
+                                <Text style={styles.dropdownIcon}>{clientDropdownOpen ? '▴' : '▾'}</Text>
                             </Pressable>
-                        ))}
-                        {!clients.length && <Text style={styles.hint}>Cadastre um cliente para começar.</Text>}
-                        {!!clients.length && !filteredClients.length && <Text style={styles.hint}>Nenhum cliente encontrado.</Text>}
+                        </View>
                     </View>
+                    {clientDropdownOpen && (
+                        <View style={styles.clientList}>
+                            {filteredClients.map((client) => (
+                                <Pressable
+                                    key={client.id}
+                                    onPress={() => {
+                                        setSelectedClientId(client.id);
+                                        setClientSearch('');
+                                        setClientDropdownOpen(false);
+                                    }}
+                                    style={[styles.clientOption, client.id === selectedClientId && styles.clientOptionSelected]}>
+                                    <Text style={styles.clientOptionTitle}>{client.legalName}</Text>
+                                    <Text style={styles.clientOptionText}>{client.tradeName || 'Sem nome fantasia'} · CNPJ {client.cnpj}</Text>
+                                </Pressable>
+                            ))}
+                            {!clients.length && <Text style={styles.hint}>Cadastre um cliente para começar.</Text>}
+                            {!!clients.length && !filteredClients.length && <Text style={styles.hint}>Nenhum cliente encontrado.</Text>}
+                        </View>
+                    )}
+                    {!!selectedClient && !clientDropdownOpen && (
+                        <Text style={styles.selectedClientText}>
+                            Selecionado: {selectedClient.legalName} · CNPJ {selectedClient.cnpj}
+                        </Text>
+                    )}
                 </Section>
 
                 <Section title="2. Dados da nota" description="Defina o ambiente e a operação da emissão.">
@@ -371,10 +425,15 @@ const styles = StyleSheet.create({
     choiceText: { color: Colors.light.text, fontSize: 12 },
     choiceTextSelected: { color: '#fff', fontSize: 12, fontWeight: '700' },
     clientList: { gap: 8 },
+    clientPicker: { flexDirection: 'row' },
+    clientSearchInput: { flex: 1, backgroundColor: '#fff', borderColor: '#d3dae6', borderBottomLeftRadius: 9, borderTopLeftRadius: 9, borderWidth: 1, color: Colors.light.text, padding: 11 },
+    dropdownButton: { alignItems: 'center', backgroundColor: '#eef3ff', borderColor: '#d3dae6', borderBottomRightRadius: 9, borderTopRightRadius: 9, borderWidth: 1, justifyContent: 'center', minWidth: 44 },
+    dropdownIcon: { color: '#0b3d91', fontSize: 18, fontWeight: '700' },
     clientOption: { backgroundColor: '#fff', borderColor: '#d3dae6', borderRadius: 9, borderWidth: 1, gap: 3, padding: 11 },
     clientOptionSelected: { backgroundColor: '#eef3ff', borderColor: '#0b3d91' },
     clientOptionTitle: { color: Colors.light.text, fontWeight: '700' },
     clientOptionText: { color: '#596579', fontSize: 12 },
+    selectedClientText: { color: '#237a43', fontSize: 13, marginTop: 2 },
     hint: { color: '#9a6700' },
     separator: { borderTopColor: '#e1e6ef', borderTopWidth: 1, marginTop: 2 },
     subheading: { color: Colors.light.text, fontSize: 14, fontWeight: '700' },
