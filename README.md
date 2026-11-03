@@ -11,17 +11,18 @@ O repositório reúne o aplicativo (Front) e o BFF (Backend for Frontend). Um **
 | Módulo | Pasta | Descrição |
 |--------|-------|-----------|
 | Front | [`NFEEmissorFront`](./NFEEmissorFront) | Interface em Expo + React (TypeScript) para emitir, consultar e acompanhar NFe e gerenciar certificados |
-| BFF | [`NFEEmissorBFF`](./NFEEmissorBFF) | Camada intermediária entre o Front e a API de NFe: autenticação, dados dos clientes, certificados e roteamento |
+| BFF | [`NFEEmissorBFF`](./NFEEmissorBFF) | Camada intermediária em Node.js entre o Front e a API de NFe: autenticação, dados dos clientes, certificados e roteamento |
+| API NFEEmissor | _[pasta ou repositório da API]_ | API de NFe executada em container Docker (Swagger em `localhost:5000`), com banco MS SQL Server |
 | Assistente fiscal (RAG) | [Repositório separado](https://github.com/igormcr/Assistente-Fiscal-de-NFe--RAG----Integra--o-com-o-NFEEmissorFront) | Assistente com IA que explica rejeições da SEFAZ e tira dúvidas de preenchimento, citando a documentação oficial |
 
 ## Arquitetura
 
 ```mermaid
 flowchart LR
-    U[Usuário] --> F[NFEEmissorFront<br/>Expo + React + TS]
-    F --> B[NFEEmissorBFF]
-    B --> DB[(Banco SQL)]
-    B --> N[API de NFe]
+    U[Usuário] --> F[NFEEmissorFront<br/>Expo + React + TS<br/>:8081]
+    F --> B[NFEEmissorBFF<br/>Node.js<br/>:3000]
+    B --> N[API NFEEmissor<br/>Docker :5000]
+    N --> DB[(MS SQL Server)]
     B -. rota de proxy .-> A[Assistente Fiscal RAG<br/>repositório separado]
     A --> V[(Banco vetorial)]
     A --> L[LLM]
@@ -48,26 +49,43 @@ flowchart LR
 ## Como rodar
 
 ### Pré-requisitos
+- Docker (para a API NFEEmissor e o MS SQL Server)
 - Node.js 18+ e npm ou yarn
 - (Opcional) Expo CLI para testes em dispositivos móveis
-- Pré-requisitos do BFF: _[preencher conforme a stack do BFF]_
 
-### Front
+### Subindo o ambiente (nesta ordem)
+
+**1. API NFEEmissor + MS SQL Server (Docker)**
+
+Suba os containers da API e do banco. Quando estiver no ar, o Swagger fica em:
+
+http://localhost:5000/swagger/index.html
+
+**2. BFF**
+
+```bash
+cd NFEEmissorBFF
+npm install
+npm run dev
+```
+
+Disponível em http://localhost:3000
+
+**3. Front**
 
 ```bash
 cd NFEEmissorFront
 npm install
-npm start
+npm run web
 ```
 
-Abra a URL de desenvolvimento no navegador. Detalhes adicionais na documentação da pasta `NFEEmissorFront`.
+Disponível em http://localhost:8081
 
-### BFF
-
-```bash
-cd NFEEmissorBFF
-# _[preencher: comandos de restore, configuração e execução]_
-```
+| Serviço | Comando | URL |
+|---------|---------|-----|
+| API NFEEmissor + SQL Server | Docker | http://localhost:5000/swagger/index.html |
+| BFF | `npm run dev` | http://localhost:3000 |
+| Front | `npm run web` | http://localhost:8081 |
 
 ### Variáveis de ambiente
 
@@ -83,7 +101,7 @@ NFEEmissorProject/
 │       ├── components/   # componentes reutilizáveis
 │       ├── lib/          # client da API e helpers de certificado
 │       ├── constants/ hooks/ types/
-├── NFEEmissorBFF/     # Backend for Frontend
+├── NFEEmissorBFF/     # Backend for Frontend (Node.js)
 └── README.md
 ```
 
@@ -91,7 +109,7 @@ NFEEmissorProject/
 
 - [x] Telas principais do Front (emitir, consultar, status, certificado)
 - [x] Monorepo com Front e BFF
-- [ ] BFF: contrato da API (OpenAPI) e esquema SQL
+- [ ] BFF: contrato da API (OpenAPI) e integração com a API NFEEmissor
 - [ ] BFF: certificados criptografados e autenticação
 - [ ] BFF: endpoints de emissão, consulta e status
 - [ ] Front: consumir o BFF, login e cadastro de clientes
