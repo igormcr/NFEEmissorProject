@@ -2,6 +2,25 @@
 
 > Versão revisada após: (1) foco do MVP na contadora e seus clientes do meio musical, (2) decisão de criar um backend próprio (BFF) com banco SQL para custodiar dados e certificados.
 
+## Estado atual da implementação
+
+- BFF Express/TypeScript com SQL Server e migrações para usuários, clientes e
+  certificados.
+- Cadastro e login com token Bearer, senha com `scrypt` e isolamento por usuário.
+- CRUD de clientes emitentes.
+- Upload de certificado A1, validação do `.pfx`, criptografia do arquivo e da
+  senha e associação a um cliente.
+- Frontend Expo/React com login, cadastro/seleção de clientes, gestão de
+  certificados e emissão de NFe.
+- Cliente HTTP para consultar NFe, consultar status, cancelar, enviar carta de
+  correção e inutilizar numeração.
+
+Ainda não foram implementados neste repositório o histórico persistido de
+NFS-e, a integração com um provedor de NFS-e, fila/idempotência, auditoria,
+alertas de vencimento e os fluxos completos descritos nos épicos E4/E5/E7/E8.
+Não marcar esses itens como concluídos apenas porque a camada técnica
+correspondente de NFe já existe.
+
 ## 1. Visão do produto
 
 **Problema:** a contadora atende vários artistas e bandas que se apresentam em todo o país. Hoje ela emite notas acessando portais diferentes, cliente por cliente, o que é lento e sujeito a erro.
@@ -57,8 +76,8 @@
 - [ ] E1.2 Modelar o banco SQL: Usuário, Prestador, Certificado, Tomador, ModeloDeServico, Nota, LogDeAuditoria
 - [ ] E1.3 Modelar multi-cliente com `TenantId` desde o início (contadora → clientes)
 - [ ] E1.4 Configurar migrations, seeds de desenvolvimento e ambientes (dev, homologação, produção)
-- [ ] E1.5 Implementar autenticação (login, sessão curta, refresh; avaliar MFA)
-- [ ] E1.6 Implementar autorização por prestador (o usuário só acessa clientes que são dele)
+- [x] E1.5 Implementar autenticação (login, sessão curta, refresh; avaliar MFA) — login e token Bearer de 7 dias implementados; refresh e MFA continuam pendentes
+- [x] E1.6 Implementar autorização por prestador (o usuário só acessa clientes que são dele) — isolamento por usuário implementado no BFF
 - [ ] E1.7 Criar a interface `IEmissorNfse` isolando o provedor, com implementação para homologação
 - [ ] E1.8 Padronizar tratamento de erros, validação de entrada e contrato da API (OpenAPI/Swagger)
 - [ ] E1.9 Configuração por ambiente e gestão de segredos (sem segredos no repositório)
@@ -75,9 +94,9 @@
 **Objetivo:** guardar e usar certificados de terceiros com o menor risco possível.
 
 - [ ] E2.1 Decidir o armazenamento: Azure Key Vault (arquivo ou chave mestra) × criptografia em camada de aplicação com envelope encryption
-- [ ] E2.2 Endpoint de upload do certificado (.pfx) com validação: formato, senha, validade, CNPJ/CPF do titular × prestador
-- [ ] E2.3 Criptografar arquivo e senha separadamente; nunca persistir em texto
-- [ ] E2.4 Garantir que nenhum endpoint devolva o arquivo ou a senha (somente metadados: titular, documento, validade, status)
+- [x] E2.2 Endpoint de upload do certificado (.pfx) com validação: formato, senha, validade, CNPJ/CPF do titular × prestador — upload e leitura dos metadados implementados; validação completa do titular ainda pendente
+- [x] E2.3 Criptografar arquivo e senha separadamente; nunca persistir em texto
+- [x] E2.4 Garantir que nenhum endpoint devolva o arquivo ou a senha (somente metadados: titular, documento, validade, status)
 - [ ] E2.5 Assinatura e transmissão feitas apenas no backend, com o certificado carregado em memória e descartado ao final
 - [ ] E2.6 Alerta de vencimento de certificado (ex.: 60, 30 e 7 dias) por cliente
 - [ ] E2.7 Fluxo de troca e de revogação/remoção definitiva de certificado
@@ -97,7 +116,7 @@
 
 **Objetivo:** reduzir o trabalho repetitivo por show.
 
-- [ ] E3.1 CRUD de prestadores (clientes da contadora): documento, razão/nome, regime, município, inscrição municipal, código de serviço e tributação padrão
+- [x] E3.1 CRUD de prestadores (clientes da contadora): documento, razão/nome, regime, município, inscrição municipal, código de serviço e tributação padrão — cadastro básico implementado; código de serviço e tributação detalhada continuam pendentes
 - [ ] E3.2 CRUD de tomadores/contratantes (casas de show, produtoras, prefeituras), com validação de CPF/CNPJ e busca de CEP
 - [ ] E3.3 Modelos de serviço reutilizáveis (descrição, código, alíquota, retenções padrão)
 - [ ] E3.4 Seleção do prestador ativo no contexto do usuário
@@ -154,10 +173,10 @@
 
 - [ ] E6.1 Migrar `nfe-api.ts` para consumir o BFF; centralizar cliente HTTP (timeout, interceptors, erro padronizado)
 - [ ] E6.2 Transformar `certificate-storage.ts` em fluxo de upload + status; remover qualquer persistência local de certificado
-- [ ] E6.3 Telas de login e sessão
-- [ ] E6.4 Seletor de cliente ativo, sempre visível
+- [x] E6.3 Telas de login e sessão
+- [x] E6.4 Seletor de cliente ativo, sempre visível — seleção está disponível nos fluxos de emissão e certificado
 - [ ] E6.5 Telas de cadastro (prestadores, tomadores, modelos)
-- [ ] E6.6 Tela de emissão otimizada para celular (poucos campos, uso de modelos)
+- [x] E6.6 Tela de emissão otimizada para celular (poucos campos, uso de modelos) — formulário de emissão NFe implementado; modelos reutilizáveis continuam pendentes
 - [ ] E6.7 Telas de consulta/histórico e de status, com estados de loading, vazio e erro
 - [ ] E6.8 Indicador visual do ambiente ativo (homologação × produção)
 - [ ] E6.9 Gestão de estado e cache (ex.: TanStack Query), ESLint/Prettier e TypeScript em modo strict

@@ -4,6 +4,14 @@
 
 **Início:** ____/____/______  **Meta de conclusão:** ____/____/______
 
+## Estado atual
+
+Este documento descreve o roadmap do serviço futuro `nfe-assistant`. O serviço
+Python/FastAPI, o corpus RAG e a integração do assistente ainda não estão
+implementados neste repositório. O `NFEEmissorFront` já possui a base de
+autenticação, seleção de clientes e integração com o BFF para operações de
+NFe; isso não deve ser confundido com a tela/API do assistente fiscal.
+
 ## Visão geral da arquitetura
 
 ```

@@ -2,6 +2,21 @@
 
 > **Como usar:** preencha tudo que estiver entre `[colchetes]`. Itens marcados com 🔎 já vêm com uma sugestão baseada no que foi conversado e **precisam ser validados** com a contadora. Apague as dicas em *itálico* quando terminar.
 
+## Nota de implementação
+
+- frontend Expo/React com autenticação, sessão e operação por cliente;
+- BFF TypeScript/Express com SQL Server, cadastro de clientes e isolamento por
+  usuário;
+- upload de certificado A1 com validação, criptografia do arquivo e da senha e
+  associação ao cliente;
+- emissão, consulta, status, cancelamento, carta de correção e inutilização de
+  NFe por meio do BFF.
+
+Essas entregas não representam a conclusão do MVP de NFS-e. Ainda precisam ser
+definidos o provedor de NFS-e, os municípios cobertos, as regras de ISS e
+retenções, o histórico persistido, a auditoria e a homologação fiscal. Os
+campos entre colchetes continuam pendentes de validação com a contadora.
+
 | Campo | Valor |
 |---|---|
 | Projeto | [nome do projeto] |
