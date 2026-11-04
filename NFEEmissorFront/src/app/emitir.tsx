@@ -1,4 +1,4 @@
-import { Stack, useFocusEffect } from 'expo-router';
+import { Link, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
@@ -16,7 +16,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { emitirNfe, listClients } from '@/lib/nfe-api';
+import { loadPresetCatalog } from '@/lib/preset-storage';
+import { useAuth } from '@/hooks/use-auth';
 import { Client } from '@/types/nfe';
+import type { NotePreset, ProductPreset, RecipientPreset } from '@/types/preset';
 
 type ItemForm = {
     codigo: string;
@@ -92,8 +95,37 @@ function Section({
     );
 }
 
+function PresetSelector({
+    title,
+    presets,
+    activeId,
+    onSelect,
+}: {
+    title: string;
+    presets: { id: string; name: string }[];
+    activeId: string | null;
+    onSelect: (id: string) => void;
+}) {
+    return (
+        <View style={styles.presetSelector}>
+            <Text style={styles.presetTitle}>{title}</Text>
+            {presets.length ? presets.map((preset) => (
+                <Pressable key={preset.id} onPress={() => onSelect(preset.id)} style={[styles.presetButton, activeId === preset.id && styles.presetButtonSelected]}>
+                    <Text style={[styles.presetButtonText, activeId === preset.id && styles.presetButtonTextSelected]}>
+                        {activeId === preset.id ? `${preset.name} aplicado` : preset.name}
+                    </Text>
+                </Pressable>
+            )) : <Text style={styles.presetHint}>Nenhum preset salvo.</Text>}
+        </View>
+    );
+}
+
 export default function EmitirScreen() {
+    const { user } = useAuth();
     const [clients, setClients] = useState<Client[]>([]);
+    const [notePresets, setNotePresets] = useState<NotePreset[]>([]);
+    const [recipientPresets, setRecipientPresets] = useState<RecipientPreset[]>([]);
+    const [productPresets, setProductPresets] = useState<ProductPreset[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [clientSearch, setClientSearch] = useState('');
     const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
@@ -104,6 +136,9 @@ export default function EmitirScreen() {
     const [serie, setSerie] = useState('1');
     const [numeroNfe, setNumeroNfe] = useState('1');
     const [naturezaOperacao, setNaturezaOperacao] = useState('Venda de produção do estabelecimento');
+    const [activeNotePreset, setActiveNotePreset] = useState<string | null>(null);
+    const [activeRecipientPreset, setActiveRecipientPreset] = useState<string | null>(null);
+    const [activeProductPreset, setActiveProductPreset] = useState<string | null>(null);
     const [recipient, setRecipient] = useState({ document: '', name: '', email: '', ie: '', street: '', number: '', neighborhood: '', cityCode: '', city: '', uf: 'SP', cep: '' });
     const [items, setItems] = useState<ItemForm[]>([{ ...emptyItem }]);
     const [additionalInfo, setAdditionalInfo] = useState('');
@@ -111,15 +146,21 @@ export default function EmitirScreen() {
     useFocusEffect(useCallback(() => {
         let active = true;
 
-        listClients()
-            .then((response) => {
+        Promise.all([
+            listClients(),
+            user ? loadPresetCatalog(user.id) : Promise.resolve({ notes: [], recipients: [], products: [] }),
+        ])
+            .then(([clientsResponse, savedPresets]) => {
                 if (!active) return;
 
-                setClients(response.data);
+                setClients(clientsResponse.data);
+                setNotePresets(savedPresets.notes);
+                setRecipientPresets(savedPresets.recipients);
+                setProductPresets(savedPresets.products);
                 setSelectedClientId((current) => (
-                    response.data.some((client) => client.id === current)
+                    clientsResponse.data.some((client) => client.id === current)
                         ? current
-                        : response.data[0]?.id ?? null
+                        : clientsResponse.data[0]?.id ?? null
                 ));
                 setClientDropdownOpen(false);
             })
@@ -132,7 +173,7 @@ export default function EmitirScreen() {
         return () => {
             active = false;
         };
-    }, []));
+    }, [user]));
 
     const selectedClient = clients.find((client) => client.id === selectedClientId);
     const filteredClients = useMemo(() => {
@@ -148,6 +189,41 @@ export default function EmitirScreen() {
 
     const updateRecipient = (field: keyof typeof recipient, value: string) => {
         setRecipient((current) => ({ ...current, [field]: value }));
+    };
+
+    const applyNotePreset = (preset: NotePreset) => {
+        setNaturezaOperacao(preset.naturezaOperacao);
+        setAdditionalInfo(preset.informacoesAdicionais);
+        setActiveNotePreset(preset.id);
+    };
+
+    const applyRecipientPreset = (preset: RecipientPreset) => {
+        setRecipient({
+            document: preset.document,
+            name: preset.recipientName,
+            email: preset.email,
+            ie: preset.ie,
+            street: preset.street,
+            number: preset.number,
+            neighborhood: preset.neighborhood,
+            cityCode: preset.cityCode,
+            city: preset.city,
+            uf: preset.uf,
+            cep: preset.cep,
+        });
+        setActiveRecipientPreset(preset.id);
+    };
+
+    const applyProductPreset = (preset: ProductPreset) => {
+        setItems((current) => current.map((item, index) => index === 0 ? ({
+            ...item,
+            cfop: preset.cfop,
+            codigo: preset.codigo,
+            ncm: preset.ncm,
+            unidade: preset.unidade,
+            descricao: preset.descricao,
+        }) : item));
+        setActiveProductPreset(preset.id);
     };
 
     const handleEmitir = async () => {
@@ -336,9 +412,42 @@ export default function EmitirScreen() {
                         <Field label="Número da NFe" value={numeroNfe} onChangeText={setNumeroNfe} keyboardType="numeric" required />
                     </View>
                     <Field label="Natureza da operação" value={naturezaOperacao} onChangeText={setNaturezaOperacao} required />
+                    <View style={styles.presetBox}>
+                        <View style={styles.presetCopy}>
+                            <Text style={styles.presetTitle}>Preset de dados da nota</Text>
+                            <Text style={styles.presetDescription}>Natureza da operação e informações adicionais.</Text>
+                        </View>
+                        {notePresets.map((preset) => (
+                            <Pressable
+                                key={preset.id}
+                                onPress={() => applyNotePreset(preset)}
+                                style={[styles.presetButton, activeNotePreset === preset.id && styles.presetButtonSelected]}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Aplicar preset ${preset.name}`}>
+                                <Text style={[styles.presetButtonText, activeNotePreset === preset.id && styles.presetButtonTextSelected]}>
+                                    {activeNotePreset === preset.id ? `${preset.name} aplicado` : preset.name}
+                                </Text>
+                            </Pressable>
+                        ))}
+                        {!notePresets.length && <Text style={styles.presetHint}>Nenhum preset salvo.</Text>}
+                        <Link href="/presets" asChild>
+                            <Pressable style={styles.managePresetsButton}>
+                                <Text style={styles.managePresetsText}>Gerenciar presets</Text>
+                            </Pressable>
+                        </Link>
+                    </View>
                 </Section>
 
                 <Section title="3. Destinatário" description="Informe quem receberá a mercadoria ou serviço.">
+                    <PresetSelector
+                        title="Preset de destinatário"
+                        presets={recipientPresets.map((preset) => ({ id: preset.id, name: preset.name }))}
+                        activeId={activeRecipientPreset}
+                        onSelect={(id) => {
+                            const preset = recipientPresets.find((item) => item.id === id);
+                            if (preset) applyRecipientPreset(preset);
+                        }}
+                    />
                     <Field label="CPF ou CNPJ" value={recipient.document} onChangeText={(value) => updateRecipient('document', value)} keyboardType="numeric" placeholder="Opcional" />
                     <Field label="Nome ou razão social" value={recipient.name} onChangeText={(value) => updateRecipient('name', value)} required />
                     <View style={styles.twoColumns}>
@@ -361,6 +470,15 @@ export default function EmitirScreen() {
                 </Section>
 
                 <Section title="4. Produtos" description="Adicione os itens. O total e o pagamento são calculados automaticamente.">
+                    <PresetSelector
+                        title="Preset de produto (aplica no primeiro item)"
+                        presets={productPresets.map((preset) => ({ id: preset.id, name: preset.name }))}
+                        activeId={activeProductPreset}
+                        onSelect={(id) => {
+                            const preset = productPresets.find((item) => item.id === id);
+                            if (preset) applyProductPreset(preset);
+                        }}
+                    />
                     {items.map((item, index) => (
                         <View key={`${index}-${item.codigo}`} style={styles.itemCard}>
                             <View style={styles.itemHeader}>
@@ -424,6 +542,19 @@ const styles = StyleSheet.create({
     choiceSelected: { backgroundColor: '#0b3d91', borderColor: '#0b3d91' },
     choiceText: { color: Colors.light.text, fontSize: 12 },
     choiceTextSelected: { color: '#fff', fontSize: 12, fontWeight: '700' },
+    presetBox: { backgroundColor: '#eef3ff', borderColor: '#c9d8f5', borderRadius: 10, borderWidth: 1, gap: 8, padding: 12 },
+    presetCopy: { gap: 3 },
+    presetSelector: { backgroundColor: '#eef3ff', borderColor: '#c9d8f5', borderRadius: 10, borderWidth: 1, gap: 8, padding: 12 },
+    presetTitle: { color: '#183b70', fontSize: 14, fontWeight: '700' },
+    presetDescription: { color: '#596579', fontSize: 12, lineHeight: 17 },
+    presetButton: { alignItems: 'center', alignSelf: 'flex-start', borderColor: '#0b3d91', borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
+    presetButtonSelected: { backgroundColor: '#0b3d91' },
+    presetButtonDetail: { color: '#596579', fontSize: 11, marginTop: 3 },
+    presetButtonText: { color: '#0b3d91', fontSize: 12, fontWeight: '700' },
+    presetButtonTextSelected: { color: '#fff' },
+    presetHint: { color: '#596579', fontSize: 11, lineHeight: 16 },
+    managePresetsButton: { alignSelf: 'flex-start', paddingVertical: 4 },
+    managePresetsText: { color: '#0b3d91', fontSize: 12, fontWeight: '700' },
     clientList: { gap: 8 },
     clientPicker: { flexDirection: 'row' },
     clientSearchInput: { flex: 1, backgroundColor: '#fff', borderColor: '#d3dae6', borderBottomLeftRadius: 9, borderTopLeftRadius: 9, borderWidth: 1, color: Colors.light.text, padding: 11 },

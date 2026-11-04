@@ -14,6 +14,7 @@ import { CertificateInfo } from '@/types/nfe';
 const quickActions = [
   { label: 'Clientes', href: '/clientes' },
   { label: 'Emitir NFe', href: '/emitir' },
+  { label: 'Presets de emissão', href: '/presets' },
   { label: 'Consultar NFe', href: '/consultar' },
   { label: 'Status de processamento', href: '/status' },
   { label: 'Ações NFe', href: '/acoes' },
